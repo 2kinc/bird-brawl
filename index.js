@@ -1,13 +1,35 @@
-function Game(renderer, width, height) {
+function Game(renderer, width, height, friction) {
   var that = this;
   this.renderer = renderer;
   this.width = width;
   this.height = height;
   this.objects = new Map();
+  this.friction = friction || 0.92;
+  this.addForce = function (force, object) {
+    object.acceleration.x += (force.x / (object.mass || 1)) || 0;
+    object.acceleration.y += (force.y / (object.mass || 1)) || 0;
+  };
+  this.animationFrame = function () {
+    that.frameUpdate();
+    that.framePhysics();
+    requestAnimationFrame(that.animationFrame);
+  }
+  this.framePhysics = function () {
+    this.objects.forEach(function (object) {
+      object.x += object.acceleration.x || 0;
+      object.y += object.acceleration.y || 0;
+      object.acceleration.x *= that.friction;
+      object.acceleration.y *= that.friction;
+    });
+  }
+  this.frameUpdate = function () {
+    //write stuff that happens every frame for your players, enemies, etc
+  };
   this.initialize = function () {
     this.renderer.canvas.width = this.width;
     this.renderer.canvas.height = this.height;
     this.renderer.objects = this.objects;
+    requestAnimationFrame(that.animationFrame);
   };
 }
 function Renderer(canvas, width, height, color, x, y) {
@@ -42,12 +64,8 @@ function Renderer(canvas, width, height, color, x, y) {
       }
     });
   };
-  this.frameUpdate = function () {
-    //write stuff that happens every frame for your players, enemies, etc
-  };
   this.animationFrame = function () {
     that.drawFrame();
-    that.frameUpdate();
     requestAnimationFrame(that.animationFrame);
   }
   this.start = function () {
@@ -55,54 +73,73 @@ function Renderer(canvas, width, height, color, x, y) {
   };
 }
 
+function GameObject(type, width, height, color, mass, x, y) {
+  this.type = type;
+  this.width = width;
+  this.height = height;
+  this.color = color;
+  this.x = x || 0;
+  this.y = y || 0;
+  this.mass = mass || 1;
+  this.acceleration = {
+    x: 0,
+    y: 0
+  };
+}
+
 var game = new Game(new Renderer(document.querySelector('#game-canvas'), innerWidth, innerHeight, 'white', 40, 100), innerWidth, innerHeight);
 game.initialize();
-var player = {
-  type: 'circle',
-  color: 'blue',
-  x: 100,
-  y: 250,
-  width: 200,
-  height: 130
-};
-var box = {
-  type: 'rect',
-  color: 'red',
-  x: 300,
-  y: 120,
-  width: 220,
-  height: 140
-}
+var player = new GameObject('circle', 200, 200, 'blue', 3, 100, 250);
+var box = new GameObject('rect', 220, 140, 'red', 1, 300, 120);
 game.objects.set('player', player); //add player to the renderer //ps. i bound the renderer's objects to game.objects it makes more sense to put objects in the game rather than in the renderer
 game.objects.set('box', box);
 game.renderer.start();
 var keys = {};
 document.addEventListener('keypress', e => keys[e.key.toLowerCase()] = e.type = true);
 document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-game.renderer.frameUpdate = function () {
+var cameraOffset = {
+  x: 0,
+  y: 0
+};
+game.frameUpdate = function () {
   if (keys['w']) {
-    player.y -= 10;
+    game.addForce({
+      x: 0,
+      y: -10
+    }, player);
   }
   if (keys['a']) {
-    player.x -= 10;
+    game.addForce({
+      x: -10,
+      y: 0
+    }, player);
   }
   if (keys['s']) {
-    player.y += 10;
+    game.addForce({
+      x: 0,
+      y: 10
+    }, player);
   }
   if (keys['d']) {
-    player.x += 10;
+    game.addForce({
+      x: 10,
+      y: 0
+    }, player);
   }
 
   if (keys['i']) {
-    game.renderer.y -= 10;
+    cameraOffset.y -= 10;
   }
   if (keys['j']) {
-    game.renderer.x -= 10;
+    cameraOffset.x -= 10;
   }
   if (keys['k']) {
-    game.renderer.y += 10;
+    cameraOffset.y += 10;
   }
   if (keys['l']) {
-    game.renderer.x += 10;
+    cameraOffset.x += 10;
   }
+
+  game.renderer.x = player.x + cameraOffset.x;
+  game.renderer.y = player.y + cameraOffset.y;
 }
